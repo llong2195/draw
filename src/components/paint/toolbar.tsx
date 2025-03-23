@@ -1,25 +1,22 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import {
-  Check,
-  ChevronDown,
+  ArrowUpRight,
   Circle,
   Download,
   FileImage,
+  Hand,
+  HelpCircle,
   Image,
   Pencil,
   PencilLine,
   Save,
-  Square,
-  Trash2,
-  X,
-  Hand,
-  ArrowUpRight,
-  Text,
   Settings,
-  HelpCircle,
+  Square,
+  Text,
+  Trash2
 } from "lucide-react";
+import { useEffect, useState } from "react";
 
 import {
   Tooltip,
@@ -35,18 +32,13 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Slider } from "@/components/ui/slider";
+import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -56,8 +48,12 @@ interface ToolbarProps {
   onClear: () => void;
   onSave: () => void;
   onSaveAsJpeg?: () => void;
-  drawMode?: "pen" | "rectangle" | "circle" | "line";
-  onDrawModeChange?: (mode: "pen" | "rectangle" | "circle" | "line") => void;
+  drawMode?: "pen" | "rectangle" | "circle" | "line" | "arrow" | "text" | "move";
+  onDrawModeChange?: (mode: "pen" | "rectangle" | "circle" | "line" | "arrow" | "text" | "move") => void;
+  roughness?: number;
+  onRoughnessChange?: (roughness: number) => void;
+  enableRough?: boolean;
+  onEnableRoughChange?: (enableRough: boolean) => void;
 }
 
 export default function Toolbar({
@@ -68,6 +64,10 @@ export default function Toolbar({
   onSaveAsJpeg,
   drawMode = "pen",
   onDrawModeChange,
+  roughness = 1,
+  onRoughnessChange,
+  enableRough = true,
+  onEnableRoughChange,
 }: ToolbarProps) {
   const [customColor, setCustomColor] = useState("#000000");
   const [showProperties, setShowProperties] = useState(true);
@@ -105,6 +105,14 @@ export default function Toolbar({
           onDrawModeChange?.("circle"); 
           toast("Circle tool selected", { icon: "⭕" });
           break;
+        case "a": 
+          onDrawModeChange?.("arrow"); 
+          toast("Arrow tool selected", { icon: "➡️" });
+          break;
+        case "t": 
+          onDrawModeChange?.("text"); 
+          toast("Text tool selected", { icon: "🔤" });
+          break;
         case "s": 
           if (e.ctrlKey) { 
             e.preventDefault(); 
@@ -138,23 +146,23 @@ export default function Toolbar({
 
   return (
     <TooltipProvider delayDuration={300}>
-      <div className="flex h-full">
-        {/* Left Sidebar - Tools (Excalidraw style) */}
-        <div className="bg-background border-r w-16 flex flex-col items-center py-2 shadow-sm">
+      <div className="flex flex-col w-full">
+        {/* Top Toolbar - Tools (now horizontal) */}
+        <div className="bg-background border-b w-full flex items-center px-2 py-1 shadow-sm">
           {/* Drawing Tools Group */}
-          <div className="space-y-1 w-full">
+          <div className="flex items-center space-x-1">
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
                   variant={drawMode === "pen" ? "secondary" : "ghost"}
                   size="icon"
                   onClick={() => onDrawModeChange?.("pen")}
-                  className="h-10 w-10 mx-auto rounded-md"
+                  className="h-9 w-9 rounded-md"
                 >
                   <Pencil className="h-5 w-5" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent side="right">
+              <TooltipContent side="bottom">
                 <p>Pencil (P)</p>
               </TooltipContent>
             </Tooltip>
@@ -165,12 +173,12 @@ export default function Toolbar({
                   variant={drawMode === "line" ? "secondary" : "ghost"}
                   size="icon"
                   onClick={() => onDrawModeChange?.("line")}
-                  className="h-10 w-10 mx-auto rounded-md"
+                  className="h-9 w-9 rounded-md"
                 >
                   <PencilLine className="h-5 w-5" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent side="right">
+              <TooltipContent side="bottom">
                 <p>Line (L)</p>
               </TooltipContent>
             </Tooltip>
@@ -181,12 +189,12 @@ export default function Toolbar({
                   variant={drawMode === "rectangle" ? "secondary" : "ghost"}
                   size="icon"
                   onClick={() => onDrawModeChange?.("rectangle")}
-                  className="h-10 w-10 mx-auto rounded-md"
+                  className="h-9 w-9 rounded-md"
                 >
                   <Square className="h-5 w-5" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent side="right">
+              <TooltipContent side="bottom">
                 <p>Rectangle (R)</p>
               </TooltipContent>
             </Tooltip>
@@ -197,12 +205,12 @@ export default function Toolbar({
                   variant={drawMode === "circle" ? "secondary" : "ghost"}
                   size="icon"
                   onClick={() => onDrawModeChange?.("circle")}
-                  className="h-10 w-10 mx-auto rounded-md"
+                  className="h-9 w-9 rounded-md"
                 >
                   <Circle className="h-5 w-5" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent side="right">
+              <TooltipContent side="bottom">
                 <p>Circle (C)</p>
               </TooltipContent>
             </Tooltip>
@@ -210,49 +218,49 @@ export default function Toolbar({
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
-                  variant="ghost"
+                  variant={drawMode === "arrow" ? "secondary" : "ghost"}
                   size="icon"
-                  className="h-10 w-10 mx-auto rounded-md"
+                  onClick={() => onDrawModeChange?.("arrow")}
+                  className="h-9 w-9 rounded-md"
                 >
                   <ArrowUpRight className="h-5 w-5" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent side="right">
-                <p>Arrow (Coming soon)</p>
+              <TooltipContent side="bottom">
+                <p>Arrow (A)</p>
               </TooltipContent>
             </Tooltip>
             
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
-                  variant="ghost"
+                  variant={drawMode === "text" ? "secondary" : "ghost"}
                   size="icon"
-                  className="h-10 w-10 mx-auto rounded-md"
+                  onClick={() => onDrawModeChange?.("text")}
+                  className="h-9 w-9 rounded-md"
                 >
                   <Text className="h-5 w-5" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent side="right">
-                <p>Text (Coming soon)</p>
+              <TooltipContent side="bottom">
+                <p>Text (T)</p>
               </TooltipContent>
             </Tooltip>
-          </div>
 
-          <Separator className="my-2 w-10" />
+            <Separator orientation="vertical" className="mx-2 h-8" />
           
-          {/* Selection tool */}
-          <div className="space-y-1 w-full">
+            {/* Selection tool */}
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-10 w-10 mx-auto rounded-md"
+                  className="h-9 w-9 rounded-md"
                 >
                   <Hand className="h-5 w-5" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent side="right">
+              <TooltipContent side="bottom">
                 <p>Move (Coming soon)</p>
               </TooltipContent>
             </Tooltip>
@@ -260,20 +268,20 @@ export default function Toolbar({
           
           <div className="flex-1"></div>
           
-          {/* Bottom actions */}
-          <div className="space-y-1 w-full mt-auto">
+          {/* Right-side actions */}
+          <div className="flex items-center space-x-1">
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
                   variant="ghost"
                   size="icon"
                   onClick={onClear}
-                  className="h-10 w-10 mx-auto rounded-md text-red-500"
+                  className="h-9 w-9 rounded-md text-red-500"
                 >
                   <Trash2 className="h-5 w-5" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent side="right">
+              <TooltipContent side="bottom">
                 <p>Clear Canvas (Delete)</p>
               </TooltipContent>
             </Tooltip>
@@ -284,12 +292,12 @@ export default function Toolbar({
                   variant="ghost"
                   size="icon"
                   onClick={handlePaste}
-                  className="h-10 w-10 mx-auto rounded-md"
+                  className="h-9 w-9 rounded-md"
                 >
                   <Image className="h-5 w-5" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent side="right">
+              <TooltipContent side="bottom">
                 <p>Paste Image (Ctrl+V)</p>
               </TooltipContent>
             </Tooltip>
@@ -299,13 +307,13 @@ export default function Toolbar({
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-10 w-10 mx-auto rounded-md"
+                  className="h-9 w-9 rounded-md"
                   onClick={() => setShowProperties(!showProperties)}
                 >
                   <Settings className="h-5 w-5" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent side="right">
+              <TooltipContent side="bottom">
                 <p>Toggle Properties Panel</p>
               </TooltipContent>
             </Tooltip>
@@ -315,12 +323,12 @@ export default function Toolbar({
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-10 w-10 mx-auto rounded-md"
+                  className="h-9 w-9 rounded-md"
                 >
                   <Save className="h-5 w-5" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent side="right">
+              <DropdownMenuContent side="bottom" align="end">
                 <DropdownMenuItem onClick={onSave}>
                   <Download className="h-4 w-4 mr-2" />
                   <span>Save as PNG</span>
@@ -337,24 +345,25 @@ export default function Toolbar({
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-10 w-10 mx-auto rounded-md"
+                  className="h-9 w-9 rounded-md"
                 >
                   <HelpCircle className="h-5 w-5" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent side="right">
+              <TooltipContent side="bottom">
                 <p>Keyboard shortcuts:<br/>
                 P: Pen, L: Line<br/>
                 R: Rectangle, C: Circle<br/>
+                A: Arrow, T: Text<br/>
                 Ctrl+S: Save, Delete: Clear</p>
               </TooltipContent>
             </Tooltip>
           </div>
         </div>
         
-        {/* Right Sidebar - Properties (Excalidraw style) */}
+        {/* Left Sidebar - Properties (now absolute positioned) */}
         {showProperties && (
-          <div className="bg-background border-l w-64 p-4 shadow-sm">
+          <div className="bg-background border-r absolute left-0 top-[calc(3rem+var(--header-height,48px))] h-[calc(100vh-var(--header-height,48px)-3rem)] w-64 p-4 shadow-sm z-10">
             <h3 className="font-medium mb-4">Properties</h3>
             
             {/* Stroke color */}
@@ -469,6 +478,56 @@ export default function Toolbar({
               </div>
             </div>
             
+            {/* Rough.js settings */}
+            {drawMode !== "pen" && drawMode !== "text" && (
+              <div className="mb-6">
+                <div className="flex justify-between items-center mb-2">
+                  <Label className="text-xs text-muted-foreground">Sketchy Style</Label>
+                  <Switch 
+                    checked={enableRough} 
+                    onCheckedChange={(checked) => onEnableRoughChange?.(checked)}
+                  />
+                </div>
+                
+                {enableRough && (
+                  <>
+                    <div className="flex justify-between items-center mb-2 mt-4">
+                      <Label className="text-xs text-muted-foreground">Roughness</Label>
+                      <span className="text-xs font-medium">{roughness.toFixed(1)}</span>
+                    </div>
+                    
+                    <Slider
+                      value={[roughness]}
+                      min={0}
+                      max={3}
+                      step={0.1}
+                      onValueChange={(value) => {
+                        onRoughnessChange?.(value[0]);
+                      }}
+                      className="mb-2"
+                    />
+                    
+                    <div className="grid grid-cols-5 gap-1">
+                      {[0, 0.5, 1, 2, 3].map((r) => (
+                        <Button
+                          key={r}
+                          variant={Math.abs(roughness - r) < 0.1 ? "secondary" : "outline"}
+                          className="p-1 h-8 text-xs"
+                          onClick={() => onRoughnessChange?.(r)}
+                        >
+                          {r === 0 ? "Smooth" : r === 3 ? "Very Rough" : r}
+                        </Button>
+                      ))}
+                    </div>
+                    
+                    <div className="mt-2 text-xs text-muted-foreground">
+                      Pro tip: Press Q to toggle sketchy style on/off
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+            
             {/* Tool specific properties */}
             <div className="mb-6">
               <Label className="text-xs mb-2 block text-muted-foreground">Tool: {drawMode}</Label>
@@ -477,6 +536,9 @@ export default function Toolbar({
                 {drawMode === "line" && "Line tool. Click and drag to create a straight line."}
                 {drawMode === "rectangle" && "Rectangle tool. Click and drag to create a rectangle."}
                 {drawMode === "circle" && "Circle tool. Click and drag to create a circle."}
+                {drawMode === "arrow" && "Arrow tool. Click and drag to create an arrow."}
+                {drawMode === "text" && "Text tool. Click to add text."}
+                {drawMode === "move" && "Move tool. Click and drag to move objects."}
               </div>
             </div>
           </div>

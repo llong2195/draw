@@ -2,6 +2,7 @@
 
 import { useRef, useState, useEffect, RefObject } from "react";
 import { toast } from "sonner";
+import rough from 'roughjs';
 
 interface CanvasProps {
   canvasRef: RefObject<HTMLCanvasElement | null>;
@@ -9,7 +10,9 @@ interface CanvasProps {
   height?: number;
   color?: string;
   lineWidth?: number;
-  drawMode?: "pen" | "rectangle" | "circle" | "line";
+  drawMode?: "pen" | "rectangle" | "circle" | "line" | "arrow" | "text" | "move";
+  roughness?: number;
+  enableRough?: boolean;
 }
 
 export default function Canvas({
@@ -19,6 +22,8 @@ export default function Canvas({
   color = "#000000",
   lineWidth = 5,
   drawMode = "pen",
+  roughness = 1,
+  enableRough = true,
 }: CanvasProps) {
   const [isDrawing, setIsDrawing] = useState(false);
   const [ctx, setCtx] = useState<CanvasRenderingContext2D | null>(null);
@@ -26,6 +31,10 @@ export default function Canvas({
   const previewCanvasRef = useRef<HTMLCanvasElement>(null);
   const [previewCtx, setPreviewCtx] = useState<CanvasRenderingContext2D | null>(null);
   const [showTooltip, setShowTooltip] = useState(true);
+  const [textInputValue, setTextInputValue] = useState("");
+  const [textInputPosition, setTextInputPosition] = useState<{ x: number; y: number } | null>(null);
+  const textInputRef = useRef<HTMLTextAreaElement>(null);
+  const roughGenerator = useRef<any>(null);
 
   // Set up both canvases
   useEffect(() => {
@@ -33,6 +42,9 @@ export default function Canvas({
     const previewCanvas = previewCanvasRef.current;
     
     if (!canvas || !previewCanvas) return;
+
+    // Initialize rough generator
+    roughGenerator.current = rough.generator();
 
     // Main canvas context
     const context = canvas.getContext("2d", { willReadFrequently: true });
@@ -80,6 +92,13 @@ export default function Canvas({
       previewCtx.lineWidth = lineWidth;
     }
   }, [color, lineWidth, ctx, previewCtx]);
+
+  // Handle text input focus when text tool is active
+  useEffect(() => {
+    if (drawMode === "text" && textInputPosition && textInputRef.current) {
+      textInputRef.current.focus();
+    }
+  }, [drawMode, textInputPosition]);
 
   const handlePaste = (e: ClipboardEvent) => {
     if (!ctx || !canvasRef.current) return;
@@ -169,6 +188,50 @@ export default function Canvas({
     };
   };
 
+  // Function to draw an arrow
+  const drawArrow = (ctx: CanvasRenderingContext2D, fromX: number, fromY: number, toX: number, toY: number) => {
+    const headLength = Math.min(lineWidth * 5, 20); // Size of arrow head depends on line thickness
+    const angle = Math.atan2(toY - fromY, toX - fromX);
+    
+    // Draw line
+    ctx.beginPath();
+    ctx.moveTo(fromX, fromY);
+    ctx.lineTo(toX, toY);
+    ctx.stroke();
+    
+    // Draw arrowhead
+    ctx.beginPath();
+    ctx.moveTo(toX, toY);
+    ctx.lineTo(
+      toX - headLength * Math.cos(angle - Math.PI / 6),
+      toY - headLength * Math.sin(angle - Math.PI / 6)
+    );
+    ctx.lineTo(
+      toX - headLength * Math.cos(angle + Math.PI / 6),
+      toY - headLength * Math.sin(angle + Math.PI / 6)
+    );
+    ctx.closePath();
+    ctx.fillStyle = color;
+    ctx.fill();
+  };
+
+  // Handle adding text to canvas
+  const applyTextToCanvas = () => {
+    if (!ctx || !textInputPosition || !textInputValue.trim()) return;
+    
+    // Set text properties
+    ctx.font = `${Math.max(lineWidth * 3, 14)}px sans-serif`;
+    ctx.fillStyle = color;
+    ctx.textBaseline = 'top';
+    
+    // Add text to canvas
+    ctx.fillText(textInputValue, textInputPosition.x, textInputPosition.y);
+    
+    // Reset text input
+    setTextInputValue("");
+    setTextInputPosition(null);
+  };
+
   const startDrawing = (e: React.MouseEvent | React.TouchEvent) => {
     if (!ctx || !previewCtx) return;
     
@@ -178,6 +241,18 @@ export default function Canvas({
     }
     
     const { x, y } = getCoordinates(e);
+    
+    if (drawMode === "text") {
+      // If the text input is already open and user clicks elsewhere, apply the current text first
+      if (textInputPosition) {
+        applyTextToCanvas();
+      }
+      
+      // Then open a new text input at the clicked position
+      setTextInputPosition({ x, y });
+      return;
+    }
+    
     setStartPos({ x, y });
     
     if (drawMode === "pen") {
@@ -206,29 +281,116 @@ export default function Canvas({
       ctx.lineTo(x, y);
       ctx.stroke();
     } else {
-      // For shapes, draw on the preview canvas
+      // For shapes, clear the preview canvas and draw with roughjs if enabled
       previewCtx.clearRect(0, 0, width, height);
-      previewCtx.beginPath();
       
-      if (drawMode === "rectangle") {
-        previewCtx.rect(
-          startPos.x, 
-          startPos.y, 
-          x - startPos.x, 
-          y - startPos.y
-        );
-      } else if (drawMode === "circle") {
-        const radius = Math.sqrt(
-          Math.pow(x - startPos.x, 2) + 
-          Math.pow(y - startPos.y, 2)
-        );
-        previewCtx.arc(startPos.x, startPos.y, radius, 0, 2 * Math.PI);
-      } else if (drawMode === "line") {
-        previewCtx.moveTo(startPos.x, startPos.y);
-        previewCtx.lineTo(x, y);
+      if (enableRough && roughGenerator.current) {
+        // Draw with roughjs
+        let roughShape;
+        
+        if (drawMode === "rectangle") {
+          roughShape = roughGenerator.current.rectangle(
+            startPos.x, startPos.y, 
+            x - startPos.x, y - startPos.y,
+            { 
+              stroke: color, 
+              strokeWidth: lineWidth,
+              roughness: roughness,
+              fill: 'transparent'
+            }
+          );
+        } else if (drawMode === "circle") {
+          const radius = Math.sqrt(
+            Math.pow(x - startPos.x, 2) + 
+            Math.pow(y - startPos.y, 2)
+          );
+          roughShape = roughGenerator.current.circle(
+            startPos.x, startPos.y, 
+            radius * 2,
+            { 
+              stroke: color, 
+              strokeWidth: lineWidth,
+              roughness: roughness,
+              fill: 'transparent'
+            }
+          );
+        } else if (drawMode === "line") {
+          roughShape = roughGenerator.current.line(
+            startPos.x, startPos.y, 
+            x, y,
+            { 
+              stroke: color, 
+              strokeWidth: lineWidth,
+              roughness: roughness
+            }
+          );
+        } else if (drawMode === "arrow") {
+          // Draw the line part with roughjs
+          roughShape = roughGenerator.current.line(
+            startPos.x, startPos.y, 
+            x, y,
+            { 
+              stroke: color, 
+              strokeWidth: lineWidth,
+              roughness: roughness
+            }
+          );
+          
+          // Draw the arrow head manually
+          const headLength = Math.min(lineWidth * 5, 20);
+          const angle = Math.atan2(y - startPos.y, x - startPos.x);
+          
+          previewCtx.save();
+          previewCtx.translate(x, y);
+          previewCtx.rotate(angle);
+          
+          // Draw arrowhead with rough
+          const arrowHead = roughGenerator.current.linearPath([
+            [0, 0],
+            [-headLength, -headLength / 2],
+            [-headLength, headLength / 2],
+            [0, 0]
+          ], {
+            stroke: color,
+            strokeWidth: lineWidth,
+            roughness: roughness,
+            fill: color
+          });
+          
+          rough.canvas(previewCanvasRef.current!).draw(arrowHead);
+          previewCtx.restore();
+        }
+        
+        if (roughShape && drawMode !== "arrow") {
+          rough.canvas(previewCanvasRef.current!).draw(roughShape);
+        }
+      } else {
+        // Regular drawing without roughjs
+        previewCtx.beginPath();
+        
+        if (drawMode === "rectangle") {
+          previewCtx.rect(
+            startPos.x, 
+            startPos.y, 
+            x - startPos.x, 
+            y - startPos.y
+          );
+          previewCtx.stroke();
+        } else if (drawMode === "circle") {
+          const radius = Math.sqrt(
+            Math.pow(x - startPos.x, 2) + 
+            Math.pow(y - startPos.y, 2)
+          );
+          previewCtx.arc(startPos.x, startPos.y, radius, 0, 2 * Math.PI);
+          previewCtx.stroke();
+        } else if (drawMode === "line") {
+          previewCtx.moveTo(startPos.x, startPos.y);
+          previewCtx.lineTo(x, y);
+          previewCtx.stroke();
+        } else if (drawMode === "arrow") {
+          drawArrow(previewCtx, startPos.x, startPos.y, x, y);
+        }
       }
-      
-      previewCtx.stroke();
     }
   };
 
@@ -262,8 +424,24 @@ export default function Canvas({
         return `url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="${cursorSize}" height="${cursorSize}" viewBox="0 0 24 24" fill="none" stroke="%23000000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle></svg>') ${cursorOffset} ${cursorOffset}, crosshair`;
       case "line": 
         return `url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="${cursorSize}" height="${cursorSize}" viewBox="0 0 24 24" fill="none" stroke="%23000000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line></svg>') ${cursorOffset} ${cursorOffset}, crosshair`;
+      case "arrow": 
+        return `url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="${cursorSize}" height="${cursorSize}" viewBox="0 0 24 24" fill="none" stroke="%23000000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>') ${cursorOffset} ${cursorOffset}, crosshair`;
+      case "text": 
+        return `url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="${cursorSize}" height="${cursorSize}" viewBox="0 0 24 24" fill="none" stroke="%23000000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>') ${cursorOffset} ${cursorOffset}, text`;
       default: 
         return "default";
+    }
+  };
+
+  // Handle text input keydown events
+  const handleTextInputKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      applyTextToCanvas();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      setTextInputValue("");
+      setTextInputPosition(null);
     }
   };
 
@@ -300,6 +478,29 @@ export default function Canvas({
         }}
       />
       
+      {/* Text input for text tool */}
+      {textInputPosition && drawMode === "text" && (
+        <textarea
+          ref={textInputRef}
+          value={textInputValue}
+          onChange={(e) => setTextInputValue(e.target.value)}
+          onKeyDown={handleTextInputKeyDown}
+          onBlur={applyTextToCanvas}
+          className="absolute z-20 bg-transparent border-none outline-none resize-none overflow-hidden"
+          style={{
+            top: textInputPosition.y,
+            left: textInputPosition.x,
+            color: color,
+            fontSize: `${Math.max(lineWidth * 3, 14)}px`,
+            fontFamily: 'sans-serif',
+            minWidth: '100px',
+            minHeight: '30px'
+          }}
+          placeholder="Type text here..."
+          autoFocus
+        />
+      )}
+      
       {/* Excalidraw-like grid background */}
       <div 
         className="absolute inset-0 pointer-events-none opacity-[0.05] grid" 
@@ -324,10 +525,13 @@ export default function Canvas({
         }}
       />
       
-      {/* Drawing Mode Tooltip - Excalidraw style */}
+      {/* Drawing Mode Tooltip - with roughness indicator */}
       {showTooltip && (
         <div className="absolute bottom-4 right-4 bg-white dark:bg-zinc-800 text-black dark:text-white px-3 py-2 rounded-md shadow-lg text-sm z-20 border border-zinc-200 dark:border-zinc-700">
           Tool: <span className="font-medium capitalize">{drawMode}</span>
+          {enableRough && drawMode !== "pen" && drawMode !== "text" && (
+            <span className="ml-2">Roughness: {roughness.toFixed(1)}</span>
+          )}
         </div>
       )}
     </div>

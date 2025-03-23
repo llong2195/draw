@@ -17,9 +17,10 @@ import {
 export default function Home() {
   const [color, setColor] = useState("#000000");
   const [lineWidth, setLineWidth] = useState(5);
-  const [drawMode, setDrawMode] = useState<"pen" | "rectangle" | "circle" | "line">("pen");
+  const [drawMode, setDrawMode] = useState<"pen" | "rectangle" | "circle" | "line" | "arrow" | "text" | "move">("pen");
+  const [roughness, setRoughness] = useState(1);
+  const [enableRough, setEnableRough] = useState(true);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const { theme } = useTheme();
   const [isMobileView, setIsMobileView] = useState(false);
 
   useEffect(() => {
@@ -55,6 +56,22 @@ export default function Home() {
           setDrawMode("line");
           toast.success("Line tool selected");
           break;
+        case 'a':
+          setDrawMode("arrow");
+          toast.success("Arrow tool selected");
+          break;
+        case 't':
+          setDrawMode("text");
+          toast.success("Text tool selected");
+          break;
+        case 'm':
+          setDrawMode("move");
+          toast.success("Move tool selected");
+          break;
+        case 'q':
+          setEnableRough(!enableRough);
+          toast.success(enableRough ? "Smooth mode" : "Sketchy mode");
+          break;
         case 's':
           if (e.ctrlKey || e.metaKey) {
             e.preventDefault();
@@ -77,7 +94,7 @@ export default function Home() {
       window.removeEventListener('resize', checkMobile);
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, []);
+  }, [enableRough]);
 
   const handleClear = () => {
     const canvas = canvasRef.current;
@@ -172,7 +189,7 @@ export default function Home() {
   return (
     <div className="flex flex-col h-screen bg-background">
       {/* Top app bar - Excalidraw style */}
-      <header className="bg-background border-b h-12 flex items-center px-4 shadow-sm z-10">
+      <header className="bg-background border-b h-12 flex items-center px-4 shadow-sm z-20">
         <div className="flex items-center space-x-2">
           <Button variant="ghost" size="icon" className="md:hidden">
             <MenuIcon className="h-5 w-5" />
@@ -208,36 +225,39 @@ export default function Home() {
         </div>
       </header>
 
-      {/* Main content area with left sidebar, canvas, and optional right sidebar */}
-      <div className="flex flex-1 overflow-hidden">
-        {/* Toolbar component is now vertical */}
-        <Toolbar
-          onColorChange={setColor}
-          onLineWidthChange={setLineWidth}
-          onClear={handleClear}
-          onSave={handleSave}
-          onSaveAsJpeg={handleSaveAsJpeg}
-          drawMode={drawMode}
-          onDrawModeChange={setDrawMode}
-        />
+      {/* Toolbar now at the top */}
+      <Toolbar
+        onColorChange={setColor}
+        onLineWidthChange={setLineWidth}
+        onClear={handleClear}
+        onSave={handleSave}
+        onSaveAsJpeg={handleSaveAsJpeg}
+        drawMode={drawMode}
+        onDrawModeChange={setDrawMode}
+        roughness={roughness}
+        onRoughnessChange={setRoughness}
+        enableRough={enableRough}
+        onEnableRoughChange={setEnableRough}
+      />
         
-        {/* Main canvas area */}
-        <main className="flex-1 overflow-hidden flex items-center justify-center bg-[#f5f5f5] dark:bg-[#121212]">
-          <Canvas
-            canvasRef={canvasRef}
-            width={isMobileView ? window.innerWidth - 32 : Math.min(window.innerWidth - 320, 1600)}
-            height={isMobileView ? 500 : Math.min(window.innerHeight - 100, 900)}
-            color={color}
-            lineWidth={lineWidth}
-            drawMode={drawMode}
-          />
-        </main>
-      </div>
+      {/* Main content area with canvas */}
+      <main className="flex-1 overflow-hidden flex items-center justify-center bg-[#f5f5f5] dark:bg-[#121212] relative">
+        <Canvas
+          canvasRef={canvasRef}
+          width={isMobileView ? window.innerWidth - 32 : Math.min(window.innerWidth - 320, 1600)}
+          height={isMobileView ? 500 : Math.min(window.innerHeight - 148, 900)} // Adjusted for the top toolbar
+          color={color}
+          lineWidth={lineWidth}
+          drawMode={drawMode}
+          roughness={roughness}
+          enableRough={enableRough}
+        />
+      </main>
       
       {/* Status bar at bottom */}
       <footer className="border-t py-1 px-4 text-xs text-muted-foreground h-6 flex items-center">
         <div className="flex-1">DrawPro Studio</div>
-        <div>Use keyboard shortcuts: P, L, R, C for tools</div>
+        <div>Use keyboard shortcuts: P, L, R, C, M, Q for tools and modes</div>
       </footer>
     </div>
   );
